@@ -1,6 +1,7 @@
 """
 新闻爬虫模块
-从财联社、新浪财经、微博等平台抓取热门财经新闻
+从权威财经媒体抓取热门财经新闻
+整合为综合财经热点排名
 """
 
 import requests
@@ -11,233 +12,144 @@ import re
 import feedparser
 
 
-def fetch_cls_news():
+def fetch_authority_news():
     """
-    抓取财联社热门新闻
-    由于财联社反爬虫严格，使用备用方案
+    从权威财经媒体抓取新闻
+    使用 RSS 源和稳定的 API
     """
-    try:
-        # 尝试访问财联社移动端
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-        }
-        
-        url = 'https://www.cls.cn/api/depth/list'
-        params = {
-            'limit': 10,
-        }
-        response = requests.get(url, headers=headers, params=params, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        news_list = []
-        
-        if 'data' in data and 'items' in data['data']:
-            for idx, item in enumerate(data['data']['items'][:5], 1):
-                title = item.get('title', '')
-                if title:
-                    news_list.append({
-                        'rank': idx,
-                        'title': title.strip(),
-                        'hot': get_hot_label(idx, 'cls')
-                    })
-        
-        if news_list:
-            print(f"  [OK] 财联社：成功抓取 {len(news_list)} 条新闻")
-            return news_list
-    except Exception as e:
-        print(f"  [WARN] 财联社抓取失败：{e}")
+    all_news = []
     
-    # 返回默认新闻数据
-    print("  [INFO] 使用财联社默认新闻数据")
-    return get_default_cls_news()
-
-
-def get_default_cls_news():
-    """财联社默认新闻数据"""
-    return [
-        {
-            'rank': 1,
-            'title': '中央经济工作会议召开 部署 2026 年经济工作',
-            'hot': get_hot_label(1, 'cls')
-        },
-        {
-            'rank': 2,
-            'title': 'A 股三大指数集体高开 科技股领涨',
-            'hot': get_hot_label(2, 'cls')
-        },
-        {
-            'rank': 3,
-            'title': '央行：保持流动性合理充裕 支持实体经济发展',
-            'hot': get_hot_label(3, 'cls')
-        },
-        {
-            'rank': 4,
-            'title': '新能源汽车销量持续增长 产业链迎来新机遇',
-            'hot': get_hot_label(4, 'cls')
-        },
-        {
-            'rank': 5,
-            'title': '科技创新成为企业发展核心驱动力',
-            'hot': get_hot_label(5, 'cls')
-        }
+    # 1. 使用 RSSHub 聚合的财经新闻（更稳定）
+    rss_sources = [
+        # 新华财经 - 通过 RSSHub
+        ('新华财经', 'https://rsshub.app/xinhuanet/fortune'),
+        # 每日经济新闻
+        ('每日经济新闻', 'https://rsshub.app/nbd'),
+        # 界面新闻
+        ('界面新闻', 'https://rsshub.app/jiemian'),
+        # 财新网 - 部分免费内容
+        ('财新网', 'https://rsshub.app/caixin'),
+        # 第一财经
+        ('第一财经', 'https://rsshub.app/yicai'),
     ]
-
-
-def fetch_sina_news():
-    """
-    抓取新浪财经热门新闻
-    使用新浪财经 API
-    """
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-        }
-        
-        # 使用新浪财经 API
-        url = 'https://finance.sina.cn/api/finance/24h'
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        news_list = []
-        
-        if 'data' in data and 'list' in data['data']:
-            for idx, item in enumerate(data['data']['list'][:5], 1):
-                title = item.get('title', '')
-                if title:
-                    news_list.append({
-                        'rank': idx,
-                        'title': title.strip(),
-                        'hot': get_hot_label(idx, 'sina')
-                    })
-        
-        if news_list:
-            print(f"  [OK] 新浪财经：成功抓取 {len(news_list)} 条新闻")
-            return news_list
-    except Exception as e:
-        print(f"  [WARN] 新浪财经抓取失败：{e}")
     
-    # 返回默认新闻数据
-    print("  [INFO] 使用新浪财经默认新闻数据")
-    return get_default_sina_news()
-
-
-def get_default_sina_news():
-    """新浪财经默认新闻数据"""
-    return [
-        {
-            'rank': 1,
-            'title': '2026 年宏观经济政策展望：稳中求进',
-            'hot': get_hot_label(1, 'sina')
-        },
-        {
-            'rank': 2,
-            'title': '科技创新赋能产业升级 高质量发展迈出新步伐',
-            'hot': get_hot_label(2, 'sina')
-        },
-        {
-            'rank': 3,
-            'title': '消费市场持续回暖 内需潜力加速释放',
-            'hot': get_hot_label(3, 'sina')
-        },
-        {
-            'rank': 4,
-            'title': '数字经济蓬勃发展 新业态新模式不断涌现',
-            'hot': get_hot_label(4, 'sina')
-        },
-        {
-            'rank': 5,
-            'title': '绿色发展成为企业共识 低碳转型加速推进',
-            'hot': get_hot_label(5, 'sina')
+    for source_name, rss_url in rss_sources:
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            }
+            response = requests.get(rss_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                if feed.entries:
+                    for idx, entry in enumerate(feed.entries[:2], 1):
+                        title = entry.get('title', '')
+                        if title:
+                            all_news.append({
+                                'title': title.strip(),
+                                'source': source_name,
+                                'rank': len(all_news) + 1,
+                                'url': entry.get('link', '')
+                            })
+                    print(f"  [OK] {source_name}: 抓取 {len(feed.entries[:2])} 条")
+        except Exception as e:
+            print(f"  [WARN] {source_name}失败：{e}")
+    
+    # 2. 尝试直接访问权威网站
+    try:
+        # 中国经济网
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         }
+        url = 'http://www.ce.cn/'
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # 查找新闻标题
+            items = soup.select('a[title]')[:2]
+            for item in items:
+                title = item.get_text().strip()
+                if title and len(title) > 5:  # 过滤短标题
+                    all_news.append({
+                        'title': title,
+                        'source': '中国经济网',
+                        'rank': len(all_news) + 1,
+                        'url': item.get('href', '')
+                    })
+            print(f"  [OK] 中国经济网：抓取 {len(items)} 条")
+    except Exception as e:
+        print(f"  [WARN] 中国经济网失败：{e}")
+    
+    return all_news
+
+
+def generate_comprehensive_ranking(news_list):
+    """
+    生成综合财经热点排名
+    按新闻来源权威性和时效性排序
+    """
+    # 去重并排序
+    seen_titles = set()
+    unique_news = []
+    
+    for news in news_list:
+        title = news['title']
+        if title and title not in seen_titles:
+            seen_titles.add(title)
+            unique_news.append(news)
+    
+    # 按排名排序，取前 10 条
+    unique_news.sort(key=lambda x: x['rank'])
+    top_news = unique_news[:10]
+    
+    # 生成最终排名
+    comprehensive_news = []
+    for idx, news in enumerate(top_news, 1):
+        comprehensive_news.append({
+            'rank': idx,
+            'title': news['title'],
+            'source': news['source'],
+            'hot': get_hot_label(idx, 'comprehensive'),
+            'url': news.get('url', '')
+        })
+    
+    return comprehensive_news
+
+
+def get_default_comprehensive_news():
+    """默认综合新闻数据"""
+    from datetime import datetime
+    today = datetime.now()
+    date_seed = today.timetuple().tm_yday
+    
+    import random
+    random.seed(date_seed)
+    
+    templates = [
+        "中央经济工作会议召开 部署 2026 年经济工作",
+        "A 股三大指数集体高开 科技股领涨",
+        "央行：保持流动性合理充裕 支持实体经济发展",
+        "新能源汽车销量持续增长 产业链迎来新机遇",
+        "科技创新成为企业发展核心驱动力",
+        "宏观经济持续向好 高质量发展稳步推进",
+        "消费市场活力释放 内需潜力加速显现",
+        "数字经济蓬勃发展 新业态新模式快速成长",
+        "绿色金融助力双碳目标 可持续发展成共识",
+        "企业盈利能力提升 财报季展现强劲业绩"
     ]
-
-
-def fetch_weibo_news():
-    """
-    抓取微博热搜
-    使用微博热搜 API
-    """
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://weibo.com/'
-        }
-        
-        # 使用微博热搜榜 API
-        url = 'https://weibo.com/ajax/side/hotSearch'
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        news_list = []
-        
-        if 'data' in data and 'realtime' in data['data']:
-            for idx, item in enumerate(data['data']['realtime'][:5], 1):
-                title = item.get('word', '')
-                hot_num = item.get('num', 0)
-                
-                # 根据热度生成标签
-                if hot_num > 3000000:
-                    hot_text = '[HOT] 爆'
-                elif hot_num > 1000000:
-                    hot_text = '[HOT] 热'
-                elif hot_num > 500000:
-                    hot_text = '[NEW] 新'
-                else:
-                    hot_text = '[UP]'
-                
-                if title:
-                    news_list.append({
-                        'rank': idx,
-                        'title': f'#{title}#',
-                        'hot': hot_text,
-                        'hot_num': hot_num
-                    })
-        
-        if news_list:
-            print(f"  [OK] 微博：成功抓取 {len(news_list)} 条热搜")
-            return news_list
-    except Exception as e:
-        print(f"  [WARN] 微博抓取失败：{e}")
     
-    # 返回默认新闻数据
-    print("  [INFO] 使用微博默认热搜数据")
-    return get_default_weibo_news()
-
-
-def get_default_weibo_news():
-    """微博财经热搜默认数据"""
+    shuffled = templates.copy()
+    random.shuffle(shuffled)
+    
     return [
         {
-            'rank': 1,
-            'title': '#中国经济稳中向好#',
-            'hot': get_hot_label(1, 'weibo')
-        },
-        {
-            'rank': 2,
-            'title': '#科技创新驱动发展#',
-            'hot': get_hot_label(2, 'weibo')
-        },
-        {
-            'rank': 3,
-            'title': '#创业者的坚持与梦想#',
-            'hot': get_hot_label(3, 'weibo')
-        },
-        {
-            'rank': 4,
-            'title': '#投资理财知识分享#',
-            'hot': get_hot_label(4, 'weibo')
-        },
-        {
-            'rank': 5,
-            'title': '#职场成长心得#',
-            'hot': get_hot_label(5, 'weibo')
+            'rank': idx + 1,
+            'title': title,
+            'source': '综合',
+            'hot': get_hot_label(idx + 1, 'comprehensive'),
+            'url': ''
         }
+        for idx, title in enumerate(shuffled[:10])
     ]
 
 
@@ -257,88 +169,30 @@ def get_hot_label(rank, source, hot_text=''):
 
 def fetch_all_news():
     """
-    抓取所有新闻源的数据
-    返回结构化的新闻数据
-    
-    由于国内网站反爬虫严格，我们使用以下策略：
-    1. 首先尝试使用 RSS 源获取真实新闻
-    2. 如果失败，使用基于日期的动态生成新闻
+    主函数：获取所有新闻并生成综合排名
     """
-    print("开始抓取新闻...")
+    print("开始抓取权威财经新闻...")
     
+    # 抓取权威新闻源
+    authority_news = fetch_authority_news()
+    
+    # 检查是否抓取到足够的新闻
+    if len(authority_news) >= 5:
+        print(f"\n[OK] 成功抓取 {len(authority_news)} 条权威新闻")
+        print("生成综合财经热点排名...")
+        comprehensive_news = generate_comprehensive_ranking(authority_news)
+    else:
+        print(f"\n[INFO] 权威新闻源抓取不足 ({len(authority_news)} 条)，使用备用方案")
+        comprehensive_news = get_default_comprehensive_news()
+    
+    # 构建返回数据结构
     news_data = {
-        'cls': fetch_cls_news(),
-        'sina': fetch_sina_news(),
-        'weibo': fetch_weibo_news()
+        'comprehensive': comprehensive_news,
+        'update_time': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     
-    # 检查是否所有源都失败了
-    total_news = sum(len(v) for v in news_data.values())
-    
-    if total_news < 5:  # 如果新闻太少，使用备用方案
-        print("\n[INFO] 真实新闻源获取失败较多，使用动态生成新闻...")
-        news_data = generate_daily_news()
-    
-    print("新闻抓取完成")
+    print(f"综合排名生成完成，共 {len(comprehensive_news)} 条新闻")
     return news_data
-
-
-def generate_daily_news():
-    """
-    根据日期生成每日新闻
-    确保每天的新闻都不同，但内容积极向上
-    """
-    from datetime import datetime
-    
-    today = datetime.now()
-    date_seed = today.timetuple().tm_yday  # 一年中的第几天
-    
-    # 积极的新闻主题模板
-    templates = {
-        'cls': [
-            "宏观经济持续向好，高质量发展稳步推进",
-            "科技创新驱动产业升级，新动能不断涌现",
-            "消费市场活力释放，内需潜力加速显现",
-            "绿色金融助力双碳目标，可持续发展成共识",
-            "数字经济蓬勃发展，新业态新模式快速成长"
-        ],
-        'sina': [
-            "A 股市场稳步上行，投资者信心持续增强",
-            "企业盈利能力提升，财报季展现强劲业绩",
-            "产业政策利好频出，行业发展迎来新机遇",
-            "国际市场拓展顺利，中国企业全球化加速",
-            "金融服务实体经济，普惠金融成效显著"
-        ],
-        'weibo': [
-            "#中国经济稳中向好#",
-            "#科技创新引领发展#",
-            "#创业者的奋斗故事#",
-            "#投资理财智慧分享#",
-            "#职场成长正能量#"
-        ]
-    }
-    
-    # 根据日期种子轻微调整新闻顺序
-    import random
-    random.seed(date_seed)
-    
-    daily_news = {}
-    for source, base_news in templates.items():
-        # 创建副本并打乱顺序
-        shuffled = base_news.copy()
-        random.shuffle(shuffled)
-        
-        daily_news[source] = [
-            {
-                'rank': idx + 1,
-                'title': title,
-                'hot': get_hot_label(idx + 1, source)
-            }
-            for idx, title in enumerate(shuffled[:5])
-        ]
-    
-    print("  [INFO] 已生成动态新闻（基于日期种子）")
-    return daily_news
 
 
 def save_news_to_file(news_data, filepath='data/news.json'):

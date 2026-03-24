@@ -23,70 +23,25 @@ def load_html_template():
 
 
 def generate_news_html(news_data):
-    """生成新闻 HTML 片段"""
+    """生成新闻 HTML 片段 - 综合财经热点排名"""
     html = ''
     
-    # 财联社
+    # 综合财经热点排名
     html += '''
             <div class="news-source">
-                <div class="news-source-header cls">
-                    <span class="icon">🔴</span>
-                    <h3>财联社 · 热门新闻</h3>
+                <div class="news-source-header comprehensive">
+                    <span class="icon">📰</span>
+                    <h3>综合财经热点 TOP10</h3>
                 </div>
                 <ul class="news-list">
 '''
-    for item in news_data.get('cls', []):
+    for item in news_data.get('comprehensive', []):
         rank_class = get_rank_class(item['rank'])
+        source_info = f" <span class=\"source-tag\">{item.get('source', '')}</span>" if item.get('source') else ""
         html += f'''
                     <li class="news-item">
                         <span class="rank {rank_class}">{item['rank']}</span>
-                        <span class="title">{item['title']}</span>
-                        <span class="hot {get_hot_class(item['hot'])}">{item['hot']}</span>
-                    </li>
-'''
-    html += '''
-                </ul>
-            </div>
-'''
-    
-    # 新浪财经
-    html += '''
-            <div class="news-source">
-                <div class="news-source-header sina">
-                    <span class="icon">📈</span>
-                    <h3>新浪财经 · 热门新闻</h3>
-                </div>
-                <ul class="news-list">
-'''
-    for item in news_data.get('sina', []):
-        rank_class = get_rank_class(item['rank'])
-        html += f'''
-                    <li class="news-item">
-                        <span class="rank {rank_class}">{item['rank']}</span>
-                        <span class="title">{item['title']}</span>
-                        <span class="hot {get_hot_class(item['hot'])}">{item['hot']}</span>
-                    </li>
-'''
-    html += '''
-                </ul>
-            </div>
-'''
-    
-    # 微博
-    html += '''
-            <div class="news-source">
-                <div class="news-source-header weibo">
-                    <span class="icon">🧣</span>
-                    <h3>微博 · 财经热搜</h3>
-                </div>
-                <ul class="news-list">
-'''
-    for item in news_data.get('weibo', []):
-        rank_class = get_rank_class(item['rank'])
-        html += f'''
-                    <li class="news-item">
-                        <span class="rank {rank_class}">{item['rank']}</span>
-                        <span class="title">{item['title']}</span>
+                        <span class="title">{item['title']}{source_info}</span>
                         <span class="hot {get_hot_class(item['hot'])}">{item['hot']}</span>
                     </li>
 '''
