@@ -13,41 +13,46 @@ import re
 def fetch_cls_news():
     """
     抓取财联社热门新闻
-    由于反爬虫限制，这里使用模拟数据
-    实际使用时需要配置代理或使用官方 API
+    使用移动端 API 获取新闻
     """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://m.cls.cn/',
         }
         
-        url = 'https://www.cls.cn/'
-        response = requests.get(url, headers=headers, timeout=10)
+        # 使用财联社移动端 API
+        url = 'https://mobile.cls.cn/api/webList'
+        params = {
+            'page': 1,
+            'num': 10,
+            'time': 0
+        }
+        response = requests.get(url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.text, 'html.parser')
+        data = response.json()
         news_list = []
         
-        # 查找新闻列表（需要根据实际网站结构调整）
-        news_items = soup.select('.depth-news-item')[:5]
-        
-        for idx, item in enumerate(news_items, 1):
-            title_elem = item.select_one('.title-text')
-            if title_elem:
-                news_list.append({
-                    'rank': idx,
-                    'title': title_elem.get_text().strip(),
-                    'hot': get_hot_label(idx, 'cls')
-                })
+        if 'data' in data and 'list' in data['data']:
+            for idx, item in enumerate(data['data']['list'][:5], 1):
+                title = item.get('title', '')
+                if title:
+                    news_list.append({
+                        'rank': idx,
+                        'title': title.strip(),
+                        'hot': get_hot_label(idx, 'cls')
+                    })
         
         if news_list:
+            print(f"  ✓ 财联社：成功抓取 {len(news_list)} 条新闻")
             return news_list
     except Exception as e:
-        print(f"财联社抓取失败：{e}")
+        print(f"  ⚠ 财联社抓取失败：{e}")
     
     # 返回默认新闻数据
+    print("  → 使用财联社默认新闻数据")
     return get_default_cls_news()
 
 
@@ -85,37 +90,40 @@ def get_default_cls_news():
 def fetch_sina_news():
     """
     抓取新浪财经热门新闻
+    使用新浪财经 API
     """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+            'Accept': 'application/json, text/plain, */*',
         }
         
-        url = 'https://finance.sina.com.cn/'
+        # 使用新浪财经热门新闻 API
+        url = 'https://newsapp.sina.cn/api/hotlist?newsId=10000'
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.text, 'html.parser')
+        data = response.json()
         news_list = []
         
-        # 查找新闻列表（需要根据实际网站结构调整）
-        news_items = soup.select('.hot-news-item')[:5]
-        
-        for idx, item in enumerate(news_items, 1):
-            title_elem = item.select_one('a')
-            if title_elem:
-                news_list.append({
-                    'rank': idx,
-                    'title': title_elem.get_text().strip(),
-                    'hot': get_hot_label(idx, 'sina')
-                })
+        if 'data' in data and 'list' in data['data']:
+            for idx, item in enumerate(data['data']['list'][:5], 1):
+                title = item.get('title', '')
+                if title:
+                    news_list.append({
+                        'rank': idx,
+                        'title': title.strip(),
+                        'hot': get_hot_label(idx, 'sina')
+                    })
         
         if news_list:
+            print(f"  ✓ 新浪财经：成功抓取 {len(news_list)} 条新闻")
             return news_list
     except Exception as e:
-        print(f"新浪财经抓取失败：{e}")
+        print(f"  ⚠ 新浪财经抓取失败：{e}")
     
     # 返回默认新闻数据
+    print("  → 使用新浪财经默认新闻数据")
     return get_default_sina_news()
 
 
@@ -152,40 +160,53 @@ def get_default_sina_news():
 
 def fetch_weibo_news():
     """
-    抓取微博财经热搜
+    抓取微博热搜
+    使用微博热搜 API
     """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+            'Accept': 'application/json, text/plain, */*',
         }
         
-        url = 'https://s.weibo.com/top/summary'
+        # 使用微博热搜榜 API
+        url = 'https://weibo.com/ajax/side/hotSearch'
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.text, 'html.parser')
+        data = response.json()
         news_list = []
         
-        # 查找热搜列表
-        news_items = soup.select('.td-02')[:5]
-        
-        for idx, item in enumerate(news_items, 1):
-            title_elem = item.select_one('a')
-            hot_elem = item.select_one('.ico')
-            if title_elem:
-                hot_text = hot_elem.get_text().strip() if hot_elem else ''
-                news_list.append({
-                    'rank': idx,
-                    'title': title_elem.get_text().strip(),
-                    'hot': get_hot_label(idx, 'weibo', hot_text)
-                })
+        if 'data' in data and 'realtime' in data['data']:
+            for idx, item in enumerate(data['data']['realtime'][:5], 1):
+                title = item.get('word', '')
+                hot_num = item.get('num', 0)
+                
+                # 根据热度生成标签
+                if hot_num > 3000000:
+                    hot_text = '🔥 爆'
+                elif hot_num > 1000000:
+                    hot_text = '🔥 热'
+                elif hot_num > 500000:
+                    hot_text = '📈 新'
+                else:
+                    hot_text = '📈'
+                
+                if title:
+                    news_list.append({
+                        'rank': idx,
+                        'title': f'#{title}#',
+                        'hot': hot_text
+                    })
         
         if news_list:
+            print(f"  ✓ 微博：成功抓取 {len(news_list)} 条热搜")
             return news_list
     except Exception as e:
-        print(f"微博抓取失败：{e}")
+        print(f"  ⚠ 微博抓取失败：{e}")
     
     # 返回默认新闻数据
+    print("  → 使用微博默认热搜数据")
     return get_default_weibo_news()
 
 
