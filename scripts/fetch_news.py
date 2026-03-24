@@ -8,34 +8,26 @@ from bs4 import BeautifulSoup
 import json
 from datetime import datetime
 import re
+import feedparser
 
 
 def fetch_cls_news():
     """
     抓取财联社热门新闻
-    使用财联社 API
+    使用财联社 RSS 订阅源
     """
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-        }
-        
-        # 使用财联社 API
-        url = 'https://www.cls.cn/nodeApi/lastList'
-        params = {
-            'pageNum': 1,
-            'pageSize': 10,
-        }
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        # 使用财联社 RSS 源
+        rss_url = 'https://www.cls.cn/rss'
+        response = requests.get(rss_url, timeout=10)
         response.raise_for_status()
         
-        data = response.json()
+        feed = feedparser.parse(response.content)
         news_list = []
         
-        if 'data' in data and 'list' in data['data']:
-            for idx, item in enumerate(data['data']['list'][:5], 1):
-                title = item.get('title', '')
+        if feed.entries:
+            for idx, entry in enumerate(feed.entries[:5], 1):
+                title = entry.get('title', '')
                 if title:
                     news_list.append({
                         'rank': idx,
@@ -88,33 +80,26 @@ def get_default_cls_news():
 def fetch_sina_news():
     """
     抓取新浪财经热门新闻
-    使用新浪财经 API
+    使用新浪财经 RSS 源
     """
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-        }
-        
-        # 使用新浪财经 7x24 小时滚动新闻 API
-        url = 'https://finance.sina.com.cn/7x24'
-        response = requests.get(url, headers=headers, timeout=10)
+        # 使用新浪财经 RSS 源
+        rss_url = 'https://finance.sina.com.cn/rss/finance.xml'
+        response = requests.get(rss_url, timeout=10)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.text, 'html.parser')
+        feed = feedparser.parse(response.content)
         news_list = []
         
-        # 查找新闻列表
-        news_items = soup.select('.item-txt')[:5]
-        
-        for idx, item in enumerate(news_items, 1):
-            title_elem = item.select_one('a')
-            if title_elem:
-                news_list.append({
-                    'rank': idx,
-                    'title': title_elem.get_text().strip(),
-                    'hot': get_hot_label(idx, 'sina')
-                })
+        if feed.entries:
+            for idx, entry in enumerate(feed.entries[:5], 1):
+                title = entry.get('title', '')
+                if title:
+                    news_list.append({
+                        'rank': idx,
+                        'title': title.strip(),
+                        'hot': get_hot_label(idx, 'sina')
+                    })
         
         if news_list:
             print(f"  [OK] 新浪财经：成功抓取 {len(news_list)} 条新闻")
@@ -167,6 +152,7 @@ def fetch_weibo_news():
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://weibo.com/'
         }
         
         # 使用微博热搜榜 API
@@ -196,7 +182,8 @@ def fetch_weibo_news():
                     news_list.append({
                         'rank': idx,
                         'title': f'#{title}#',
-                        'hot': hot_text
+                        'hot': hot_text,
+                        'hot_num': hot_num
                     })
         
         if news_list:
