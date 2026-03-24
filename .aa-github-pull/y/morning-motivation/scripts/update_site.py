@@ -147,10 +147,10 @@ def update_html(news_data, daily_content):
         message_p = encouragement_section.select('p')
         if message_p:
             # 分割消息内容为多行
-            message_lines = daily_content['message_content'].split('。')
+            message_lines = daily_content['message_content'].split('.')
             for i, p in enumerate(message_p):
                 if i < len(message_lines):
-                    text = message_lines[i] + '。' if i < len(message_lines) - 1 else message_lines[i]
+                    text = message_lines[i] + '.' if i < len(message_lines) - 1 else message_lines[i]
                     p.string = text.strip()
     
     # 更新行动建议
@@ -160,7 +160,7 @@ def update_html(news_data, daily_content):
         if card_text:
             card_text.string = daily_content['message_content']
     
-    # 更新新闻模块
+    # 更新新闻模块 - 完全重建，删除多余的新闻区块
     news_section = soup.select_one('.news-section')
     if news_section:
         # 更新更新时间
@@ -168,11 +168,16 @@ def update_html(news_data, daily_content):
         if update_time:
             update_time.string = datetime.now().strftime('%Y-%m-%d %H:%M')
         
-        # 更新新闻列表 - 综合财经热点
+        # 查找所有新闻源
         news_sources = news_section.select('.news-source')
+        
         if news_sources:
-            # 更新综合财经热点
+            # 只保留第一个，更新为综合财经热点
             update_news_source(news_sources[0], news_data.get('comprehensive', []))
+            
+            # 删除其他旧的新闻源（新浪财经、微博）
+            for i, source in enumerate(news_sources[1:], 1):
+                source.decompose()
     
     # 保存更新后的 HTML
     with open('index.html', 'w', encoding='utf-8') as f:
