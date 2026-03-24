@@ -14,20 +14,28 @@ import feedparser
 def fetch_cls_news():
     """
     抓取财联社热门新闻
-    使用财联社 RSS 订阅源
+    由于财联社反爬虫严格，使用备用方案
     """
     try:
-        # 使用财联社 RSS 源
-        rss_url = 'https://www.cls.cn/rss'
-        response = requests.get(rss_url, timeout=10)
+        # 尝试访问财联社移动端
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+        }
+        
+        url = 'https://www.cls.cn/api/depth/list'
+        params = {
+            'limit': 10,
+        }
+        response = requests.get(url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
         
-        feed = feedparser.parse(response.content)
+        data = response.json()
         news_list = []
         
-        if feed.entries:
-            for idx, entry in enumerate(feed.entries[:5], 1):
-                title = entry.get('title', '')
+        if 'data' in data and 'items' in data['data']:
+            for idx, item in enumerate(data['data']['items'][:5], 1):
+                title = item.get('title', '')
                 if title:
                     news_list.append({
                         'rank': idx,
@@ -80,20 +88,25 @@ def get_default_cls_news():
 def fetch_sina_news():
     """
     抓取新浪财经热门新闻
-    使用新浪财经 RSS 源
+    使用新浪财经 API
     """
     try:
-        # 使用新浪财经 RSS 源
-        rss_url = 'https://finance.sina.com.cn/rss/finance.xml'
-        response = requests.get(rss_url, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+        }
+        
+        # 使用新浪财经 API
+        url = 'https://finance.sina.cn/api/finance/24h'
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
-        feed = feedparser.parse(response.content)
+        data = response.json()
         news_list = []
         
-        if feed.entries:
-            for idx, entry in enumerate(feed.entries[:5], 1):
-                title = entry.get('title', '')
+        if 'data' in data and 'list' in data['data']:
+            for idx, item in enumerate(data['data']['list'][:5], 1):
+                title = item.get('title', '')
                 if title:
                     news_list.append({
                         'rank': idx,
